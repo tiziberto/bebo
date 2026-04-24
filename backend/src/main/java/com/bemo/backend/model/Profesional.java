@@ -24,7 +24,7 @@ public class Profesional {
     @Transient
     private String apellido;
 
-    @Transient
+    @Column(length = 50)
     private String dni;
 
     @Column(length = 50)
@@ -41,7 +41,7 @@ public class Profesional {
     private String categoria = "A";
 
     @Column(name = "cuit", length = 20)
-    private String cuit;
+    private String cuit = "S/D";
 
     /** FK a condicion_iva según el schema SQL. */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -59,7 +59,7 @@ public class Profesional {
      * una tabla join separada; esto es una columna adicional.
      */
     @Column(name = "especialidad", length = 150)
-    private String especialidadTexto;
+    private String especialidadTexto = "Sin especificar";
 
     @Column(name = "asigna_turnos", nullable = false)
     private Boolean asignaTurnos = false;
@@ -128,6 +128,8 @@ public class Profesional {
         this.updatedAt = now;
         if (this.createdBy == null) this.createdBy = "";
         if (this.updatedBy == null) this.updatedBy = "";
+        // Ensure cuit has a default value (database requires it to be NOT NULL)
+        if (this.cuit == null) this.cuit = "S/D";
     }
 
     @PreUpdate

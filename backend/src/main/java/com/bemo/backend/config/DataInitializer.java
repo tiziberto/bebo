@@ -60,7 +60,7 @@ public class DataInitializer implements ApplicationRunner {
         admin.setPassword(passwordEncoder.encode("admin123"));
         admin.setEmail("admin@ecomed.com");
         admin.setNombre("Administrador");
-        admin.setNivel(9);
+        admin.setNivel(1);
         admin.setIsActive(true);
         admin.setRoles(Set.of(rolAdmin));
 

@@ -48,6 +48,21 @@ public class PacienteService {
     }
 
     public PacienteDto create(PacienteDto dto) {
+        if (dto.getNombre() == null || dto.getNombre().isBlank()) {
+            throw new RuntimeException("El nombre es obligatorio.");
+        }
+        if (dto.getDni() == null || dto.getDni().isBlank()) {
+            throw new RuntimeException("El DNI es obligatorio.");
+        }
+        if (dto.getFechaNacimiento() == null || dto.getFechaNacimiento().isBlank()) {
+            throw new RuntimeException("La fecha de nacimiento es obligatoria.");
+        }
+        if (dto.getTelefono() == null || dto.getTelefono().isBlank()) {
+            throw new RuntimeException("El teléfono es obligatorio.");
+        }
+        if (dto.getEmail() == null || dto.getEmail().isBlank()) {
+            throw new RuntimeException("El email es obligatorio.");
+        }
         if (dto.getDni() != null) {
             try {
                 BigInteger documento = new BigInteger(dto.getDni().trim());
@@ -58,10 +73,20 @@ public class PacienteService {
         }
         Paciente p = new Paciente();
         mapFromDto(p, dto);
+        p.setFechaAlta(LocalDate.now());
         return toDto(repo.save(p));
     }
 
     public PacienteDto update(Long id, PacienteDto dto) {
+        if (dto.getFechaNacimiento() == null || dto.getFechaNacimiento().isBlank()) {
+            throw new RuntimeException("La fecha de nacimiento es obligatoria.");
+        }
+        if (dto.getTelefono() == null || dto.getTelefono().isBlank()) {
+            throw new RuntimeException("El teléfono es obligatorio.");
+        }
+        if (dto.getEmail() == null || dto.getEmail().isBlank()) {
+            throw new RuntimeException("El email es obligatorio.");
+        }
         Paciente p = repo.findById(id).orElseThrow(() -> new RuntimeException("Paciente no encontrado"));
         mapFromDto(p, dto);
         return toDto(repo.save(p));

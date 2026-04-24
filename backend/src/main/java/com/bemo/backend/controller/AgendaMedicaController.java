@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -56,6 +57,19 @@ public class AgendaMedicaController {
         try {
             service.delete(id);
             return ResponseEntity.ok(Map.of("message", "Agenda eliminada"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("-medica/disponibles")
+    public ResponseEntity<?> getDisponibles(
+            @RequestParam Long profesionalId,
+            @RequestParam Long sucursalId,
+            @RequestParam String desde,
+            @RequestParam String hasta) {
+        try {
+            return ResponseEntity.ok(service.getDisponibles(profesionalId, sucursalId, LocalDate.parse(desde), LocalDate.parse(hasta)));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

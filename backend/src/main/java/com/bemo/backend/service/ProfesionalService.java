@@ -75,6 +75,25 @@ public class ProfesionalService {
 
     @Transactional
     public ProfesionalDto create(ProfesionalDto dto) {
+        // Validate required fields
+        if (dto.getMatricula() == null || dto.getMatricula().isBlank()) {
+            throw new RuntimeException("Matrícula es obligatoria.");
+        }
+        if (dto.getDni() == null || dto.getDni().isBlank()) {
+            throw new RuntimeException("DNI es obligatorio.");
+        }
+        if (dto.getTelefono() == null || dto.getTelefono().isBlank()) {
+            throw new RuntimeException("Teléfono es obligatorio.");
+        }
+        if (dto.getEmail() == null || dto.getEmail().isBlank()) {
+            throw new RuntimeException("Email es obligatorio.");
+        }
+
+        // Check DNI uniqueness (exclusive constraint)
+        if (repo.findByDni(dto.getDni()).isPresent()) {
+            throw new RuntimeException("Ya existe un profesional con DNI " + dto.getDni());
+        }
+
         Profesional p = new Profesional();
         mapFromDto(p, dto);
         return toDto(repo.save(p));
@@ -95,9 +114,12 @@ public class ProfesionalService {
 
     private void mapFromDto(Profesional p, ProfesionalDto dto) {
         if (dto.getNombre() != null) p.setNombre(dto.getNombre());
+        if (dto.getDni() != null) p.setDni(dto.getDni());
         if (dto.getMatricula() != null) p.setMatricula(dto.getMatricula());
         if (dto.getTelefono() != null) p.setTelefono(dto.getTelefono());
         if (dto.getEmail() != null) p.setEmail(dto.getEmail());
+        // Set default value for cuit if not provided (required by database)
+        if (p.getCuit() == null) p.setCuit("S/D");
 
         if (dto.getEspecialidadesIds() != null) {
             p.setEspecialidades(new HashSet<>(especialidadRepo.findAllById(dto.getEspecialidadesIds())));
@@ -115,7 +137,7 @@ public class ProfesionalService {
 
     private ProfesionalDto toDto(Profesional p) {
         return new ProfesionalDto(
-            p.getId(), p.getNombre(), null, null, p.getMatricula(),
+            p.getId(), p.getNombre(), null, p.getDni(), p.getMatricula(),
             p.getTelefono(), p.getEmail(),
             p.getEspecialidades().stream().map(Especialidad::getId).collect(Collectors.toSet()),
             p.getObrasSociales().stream().map(ObraSocial::getId).collect(Collectors.toSet()),

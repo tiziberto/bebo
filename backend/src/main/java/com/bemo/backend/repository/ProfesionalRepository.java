@@ -20,4 +20,6 @@ public interface ProfesionalRepository extends JpaRepository<Profesional, Long> 
     List<Profesional> findBySucursalId(@Param("sucursalId") Long sucursalId);
 
     Optional<Profesional> findById(Long id);
+
+    Optional<Profesional> findByDni(String dni);
 }

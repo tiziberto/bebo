@@ -1,6 +1,8 @@
 package com.bemo.backend.controller;
 
 import com.bemo.backend.dto.TurnoDto;
+import com.bemo.backend.dto.EnviarConfirmacionesFechaRequest;
+import com.bemo.backend.dto.RespuestaConfirmacionesMasivasDto;
 import com.bemo.backend.model.Turno;
 import com.bemo.backend.repository.TurnoRepository;
 import com.bemo.backend.service.EmailService;
@@ -132,6 +134,26 @@ public class TurnoController {
             ));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /** Envía confirmaciones masivas a todos los turnos de una fecha */
+    @PostMapping("/confirmacion/enviar-por-fecha")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPCION')")
+    public ResponseEntity<?> enviarConfirmacionesPorFecha(
+            @RequestBody EnviarConfirmacionesFechaRequest request) {
+        try {
+            if (request.getFecha() == null) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "La fecha es requerida"));
+            }
+
+            RespuestaConfirmacionesMasivasDto resultado = service.enviarConfirmacionesPorFecha(request);
+            return ResponseEntity.ok(resultado);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Error al enviar confirmaciones: " + e.getMessage()));
         }
     }
 }
