@@ -64,6 +64,13 @@ function toggle(arr: number[], val: number) {
   if (i >= 0) arr.splice(i, 1); else arr.push(val);
 }
 
+function toggleAll(arr: number[], items: { id: number }[], selectAll: boolean) {
+  arr.length = 0;
+  if (selectAll) {
+    arr.push(...items.map(item => item.id));
+  }
+}
+
 async function loadPage(page: number) {
   loading.value = true;
   currentPage.value = page;
@@ -102,6 +109,10 @@ onMounted(loadData);
 async function createProf() {
   newError.value = "";
   if (!newForm.value.nombre || !newForm.value.apellido) { newError.value = "Nombre y apellido son obligatorios."; return; }
+  if (!newForm.value.dni) { newError.value = "DNI es obligatorio."; return; }
+  if (!newForm.value.matricula) { newError.value = "Matrícula es obligatoria."; return; }
+  if (!newForm.value.telefono) { newError.value = "Teléfono es obligatorio."; return; }
+  if (!newForm.value.email) { newError.value = "Email es obligatorio."; return; }
   if (newForm.value.sucursalesIds.length === 0) { newError.value = "Seleccioná al menos una sucursal."; return; }
   newSaving.value = true;
   try {
@@ -194,20 +205,20 @@ async function deleteProf(id: number) {
               <Input v-model="newForm.nombre" placeholder="Nombre" required />
             </div>
             <div class="space-y-1">
-              <label class="text-sm font-medium">DNI</label>
-              <Input v-model="newForm.dni" placeholder="DNI" />
+              <label class="text-sm font-medium">DNI <span class="text-destructive">*</span></label>
+              <Input v-model="newForm.dni" placeholder="DNI" required />
             </div>
             <div class="space-y-1">
-              <label class="text-sm font-medium">Matrícula</label>
-              <Input v-model="newForm.matricula" placeholder="Matrícula profesional" />
+              <label class="text-sm font-medium">Matrícula <span class="text-destructive">*</span></label>
+              <Input v-model="newForm.matricula" placeholder="Matrícula profesional" required />
             </div>
             <div class="space-y-1">
-              <label class="text-sm font-medium">Teléfono</label>
-              <Input v-model="newForm.telefono" placeholder="Teléfono" />
+              <label class="text-sm font-medium">Teléfono <span class="text-destructive">*</span></label>
+              <Input v-model="newForm.telefono" placeholder="Teléfono" required />
             </div>
             <div class="space-y-1">
-              <label class="text-sm font-medium">Email</label>
-              <Input v-model="newForm.email" type="email" placeholder="correo@ejemplo.com" />
+              <label class="text-sm font-medium">Email <span class="text-destructive">*</span></label>
+              <Input v-model="newForm.email" type="email" placeholder="correo@ejemplo.com" required />
             </div>
           </div>
 
@@ -239,7 +250,15 @@ async function deleteProf(id: number) {
 
           <!-- Obras Sociales -->
           <div class="space-y-2">
-            <label class="text-sm font-medium">Obras Sociales que acepta</label>
+            <div class="flex items-center justify-between">
+              <label class="text-sm font-medium">Obras Sociales que acepta</label>
+              <div class="flex gap-2">
+                <button type="button" @click="toggleAll(newForm.obrasSocialesIds, obrasSociales, true)"
+                  class="text-xs px-2 py-1 rounded border hover:bg-muted transition-colors">Seleccionar todo</button>
+                <button type="button" @click="toggleAll(newForm.obrasSocialesIds, obrasSociales, false)"
+                  class="text-xs px-2 py-1 rounded border hover:bg-muted transition-colors">Limpiar</button>
+              </div>
+            </div>
             <div class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto border rounded-md p-2">
               <button v-for="os in obrasSociales" :key="os.id" type="button" @click="toggle(newForm.obrasSocialesIds, os.id)"
                 :class="['inline-flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors',
@@ -253,7 +272,15 @@ async function deleteProf(id: number) {
 
           <!-- Estudios que realiza -->
           <div class="space-y-2">
-            <label class="text-sm font-medium">Estudios que realiza</label>
+            <div class="flex items-center justify-between">
+              <label class="text-sm font-medium">Estudios que realiza</label>
+              <div class="flex gap-2">
+                <button type="button" @click="toggleAll(newForm.estudiosIds, estudios, true)"
+                  class="text-xs px-2 py-1 rounded border hover:bg-muted transition-colors">Seleccionar todo</button>
+                <button type="button" @click="toggleAll(newForm.estudiosIds, estudios, false)"
+                  class="text-xs px-2 py-1 rounded border hover:bg-muted transition-colors">Limpiar</button>
+              </div>
+            </div>
             <div class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto border rounded-md p-2">
               <button v-for="e in estudios" :key="e.id" type="button" @click="toggle(newForm.estudiosIds, e.id)"
                 :class="['inline-flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors',
@@ -379,9 +406,17 @@ async function deleteProf(id: number) {
                             Estudios que realiza
                             <span class="ml-2 text-primary normal-case">{{ editForm.estudiosIds.length }} seleccionados</span>
                           </label>
-                          <button type="button" @click="showEstudios = !showEstudios" class="text-xs text-primary hover:underline">
-                            {{ showEstudios ? 'Ocultar' : 'Ver todos los estudios' }}
-                          </button>
+                          <div class="flex gap-1.5">
+                            <button type="button" @click="toggleAll(editForm.estudiosIds, estudios, true)"
+                              class="text-xs text-primary hover:underline">Seleccionar todo</button>
+                            <span class="text-muted-foreground">·</span>
+                            <button type="button" @click="toggleAll(editForm.estudiosIds, estudios, false)"
+                              class="text-xs text-primary hover:underline">Limpiar</button>
+                            <span class="text-muted-foreground">·</span>
+                            <button type="button" @click="showEstudios = !showEstudios" class="text-xs text-primary hover:underline">
+                              {{ showEstudios ? 'Ocultar' : 'Ver todos' }}
+                            </button>
+                          </div>
                         </div>
                         <div v-if="showEstudios" class="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto border rounded-md p-2 bg-muted/20">
                           <button v-for="e in estudios" :key="e.id" type="button" @click="toggle(editForm.estudiosIds, e.id)"
@@ -399,9 +434,17 @@ async function deleteProf(id: number) {
 
                       <!-- Obras Sociales -->
                       <div class="space-y-1.5">
-                        <label class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Obras Sociales
-                          <span class="ml-2 text-secondary normal-case">{{ editForm.obrasSocialesIds.length }} seleccionadas</span>
-                        </label>
+                        <div class="flex items-center justify-between">
+                          <label class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Obras Sociales
+                            <span class="ml-2 text-secondary normal-case">{{ editForm.obrasSocialesIds.length }} seleccionadas</span>
+                          </label>
+                          <div class="flex gap-1.5">
+                            <button type="button" @click="toggleAll(editForm.obrasSocialesIds, obrasSociales, true)"
+                              class="text-xs px-2 py-0.5 rounded border hover:bg-muted transition-colors">Seleccionar todo</button>
+                            <button type="button" @click="toggleAll(editForm.obrasSocialesIds, obrasSociales, false)"
+                              class="text-xs px-2 py-0.5 rounded border hover:bg-muted transition-colors">Limpiar</button>
+                          </div>
+                        </div>
                         <div class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto border rounded-md p-2 bg-muted/20">
                           <button v-for="os in obrasSociales" :key="os.id" type="button" @click="toggle(editForm.obrasSocialesIds, os.id)"
                             :class="['inline-flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors',

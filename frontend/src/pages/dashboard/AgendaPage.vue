@@ -4,7 +4,7 @@ import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
 import {
   ChevronLeft, ChevronRight, CalendarDays, Calendar,
-  RefreshCw, Filter, Plus, X, Trash2,
+  RefreshCw, Filter, Plus, X, Trash2, Send,
 } from "lucide-vue-next";
 import Card from "@/components/ui/Card.vue";
 import CardContent from "@/components/ui/CardContent.vue";
@@ -226,6 +226,55 @@ const monthGrid = computed<(Date | null)[]>(() => {
 // Turno detail modal
 const selectedTurno = ref<TurnoDto | null>(null);
 
+// ─── Confirmaciones Masivas ───────────────────────────────────────────────────
+const showConfirmacionesModal = ref(false);
+const confirmacionesRequest = ref({
+  fecha: null as string | null,
+  profesionalId: null as number | null,
+  incluirConfirmados: false,
+});
+const confirmacionesLoading = ref(false);
+const confirmacionesResultado = ref<any>(null);
+
+function abrirConfirmacionesMasivas() {
+  const hoy = new Date();
+  confirmacionesRequest.value.fecha = hoy.toISOString().split("T")[0];
+  confirmacionesRequest.value.profesionalId = selectedProfId.value ? Number(selectedProfId.value) : null;
+  showConfirmacionesModal.value = true;
+  confirmacionesResultado.value = null;
+}
+
+async function enviarConfirmacionesMasivas() {
+  if (!confirmacionesRequest.value.fecha) {
+    alert("Selecciona una fecha");
+    return;
+  }
+
+  confirmacionesLoading.value = true;
+  try {
+    const response = await axios.post(
+      `${API_TURNOS}/confirmacion/enviar-por-fecha`,
+      {
+        fecha: confirmacionesRequest.value.fecha,
+        profesionalId: confirmacionesRequest.value.profesionalId,
+        incluirConfirmados: confirmacionesRequest.value.incluirConfirmados,
+      },
+      { headers: headers() }
+    );
+
+    confirmacionesResultado.value = response.data;
+  } catch (error: any) {
+    alert("Error: " + (error.response?.data?.error || error.message));
+  } finally {
+    confirmacionesLoading.value = false;
+  }
+}
+
+function cerrarConfirmacionesModal() {
+  showConfirmacionesModal.value = false;
+  confirmacionesResultado.value = null;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SCHEDULE TAB (Agenda config)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -406,6 +455,12 @@ onMounted(async () => {
         <button @click="loadTurnos" :disabled="loading"
           class="p-1.5 rounded border hover:bg-muted transition-colors" title="Actualizar">
           <RefreshCw :class="['h-4 w-4', loading && 'animate-spin']" />
+        </button>
+        <button v-if="canFilter"
+          @click="abrirConfirmacionesMasivas"
+          class="px-3 py-1.5 text-sm rounded border border-primary bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-2">
+          <Send class="h-4 w-4" />
+          Enviar confirmaciones
         </button>
       </div>
 
@@ -719,6 +774,132 @@ onMounted(async () => {
           <div class="px-5 py-3 border-t flex justify-end">
             <button @click="selectedTurno = null"
               class="px-4 py-1.5 text-sm rounded border hover:bg-muted transition-colors">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ═══════════ CONFIRMACIONES MASIVAS MODAL ═══════════ -->
+    <Teleport to="body">
+      <div v-if="showConfirmacionesModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-96 overflow-y-auto">
+          <!-- Header -->
+          <div class="sticky top-0 bg-gradient-to-r from-primary to-primary/80 text-white px-6 py-4 flex justify-between items-center">
+            <h2 class="text-lg font-semibold">Enviar Confirmaciones Masivas</h2>
+            <button
+              @click="cerrarConfirmacionesModal"
+              class="text-white hover:bg-white/20 p-1 rounded"
+            >
+              ✕
+            </button>
+          </div>
+
+          <!-- Contenido -->
+          <div v-if="!confirmacionesResultado" class="p-6 space-y-4">
+            <!-- Fecha -->
+            <div>
+              <label class="block text-sm font-medium mb-2">Fecha *</label>
+              <input
+                v-model="confirmacionesRequest.fecha"
+                type="date"
+                class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            <!-- Profesional (solo si hay permiso) -->
+            <div v-if="isAdmin">
+              <label class="block text-sm font-medium mb-2">Profesional (Opcional)</label>
+              <select
+                v-model.number="confirmacionesRequest.profesionalId"
+                class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option :value="null">Todos los profesionales</option>
+                <option v-for="prof in profesionales" :key="prof.id" :value="prof.id">
+                  {{ prof.apellido }}, {{ prof.nombre }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Incluir confirmados -->
+            <label class="flex items-center gap-2">
+              <input
+                v-model="confirmacionesRequest.incluirConfirmados"
+                type="checkbox"
+                class="rounded"
+              />
+              <span class="text-sm">Incluir turnos ya confirmados</span>
+            </label>
+
+            <!-- Botones -->
+            <div class="flex gap-3 pt-4">
+              <button
+                @click="enviarConfirmacionesMasivas"
+                :disabled="confirmacionesLoading || !confirmacionesRequest.fecha"
+                class="flex-1 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {{ confirmacionesLoading ? "Enviando..." : "Enviar Confirmaciones" }}
+              </button>
+              <button
+                @click="cerrarConfirmacionesModal"
+                class="flex-1 px-4 py-2 border rounded-md hover:bg-muted transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+
+          <!-- Resultados -->
+          <div v-else class="p-6 space-y-4">
+            <!-- Resumen -->
+            <div class="bg-muted p-4 rounded-lg">
+              <div class="grid grid-cols-3 gap-4 text-center mb-3">
+                <div>
+                  <div class="text-2xl font-bold text-primary">{{ confirmacionesResultado.total }}</div>
+                  <div class="text-xs text-muted-foreground">Total</div>
+                </div>
+                <div>
+                  <div class="text-2xl font-bold text-green-600">{{ confirmacionesResultado.enviados }}</div>
+                  <div class="text-xs text-muted-foreground">Enviados</div>
+                </div>
+                <div>
+                  <div class="text-2xl font-bold text-red-600">{{ confirmacionesResultado.fallidos }}</div>
+                  <div class="text-xs text-muted-foreground">Fallidos</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tabla de detalles -->
+            <div class="space-y-2 max-h-48 overflow-y-auto">
+              <div
+                v-for="detalle in confirmacionesResultado.detalles"
+                :key="detalle.turnoId"
+                :class="[
+                  'p-3 rounded-md border text-sm',
+                  detalle.exitoso
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-red-50 border-red-200'
+                ]"
+              >
+                <div class="font-medium">{{ detalle.paciente }}</div>
+                <div class="text-xs text-muted-foreground">{{ detalle.email || "Sin email" }}</div>
+                <div v-if="!detalle.exitoso" class="text-xs text-red-600 mt-1">
+                  ❌ {{ detalle.razon }}
+                </div>
+                <div v-else class="text-xs text-green-600 mt-1">
+                  ✓ Confirmación enviada
+                </div>
+              </div>
+            </div>
+
+            <!-- Botón cerrar -->
+            <div class="flex gap-3 pt-4">
+              <button
+                @click="cerrarConfirmacionesModal"
+                class="flex-1 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       </div>

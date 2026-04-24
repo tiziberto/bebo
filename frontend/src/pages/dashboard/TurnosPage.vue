@@ -10,19 +10,36 @@ import Input from "@/components/ui/Input.vue";
 import Button from "@/components/ui/Button.vue";
 import Select from "@/components/ui/Select.vue";
 import { Plus, X, CalendarDays, Clock, Search, RefreshCw, Mail, CheckCircle2 } from "lucide-vue-next";
+import AvailableSlotsAgenda from "@/components/ui/AvailableSlotsAgenda.vue";
 
 const API = "http://localhost:8080/api";
 const auth = useAuthStore();
 const headers = () => ({ Authorization: `Bearer ${auth.token}` });
 
 interface TurnoDto {
-  id: number; pacienteId: number; pacienteNombre: string; pacienteDni: string;
-  profesionalId: number; profesionalNombre: string;
-  sucursalId: number; sucursalNombre: string;
-  estudioId: number | null; estudioNombre: string | null;
-  obraSocialId: number | null; obraSocialNombre: string | null;
-  planId: number | null; planNombre: string | null;
-  fechaHora: string; estado: string; observaciones: string | null; createdAt: string;
+  id: number;
+  pacienteId: number;
+  pacienteNombre: string;
+  pacienteApellido: string | null;
+  pacienteDni: string;
+  pacienteEmail: string | null;
+  pacienteTelefono: string | null;
+  profesionalId: number;
+  profesionalNombre: string;
+  profesionalApellido: string | null;
+  sucursalId: number | null;
+  sucursalNombre: string | null;
+  estudioId: number | null;
+  estudioNombre: string | null;
+  obraSocialId: number | null;
+  obraSocialNombre: string | null;
+  planId: number | null;
+  planNombre: string | null;
+  fechaHora: string;
+  estado: string;
+  observaciones: string | null;
+  createdAt: string;
+  confirmacionEnviadaAt: string | null;
 }
 
 const turnos = ref<TurnoDto[]>([]);
@@ -49,6 +66,9 @@ const newSaving = ref(false);
 const newError = ref("");
 const pacienteSearch = ref("");
 const pacienteResults = ref<{ id: number; nombre: string; apellido: string; dni: string }[]>([]);
+
+// Calendar para horarios disponibles
+const showCalendar = ref(false);
 
 // Reprogramar
 const reprogramId = ref<number | null>(null);
@@ -115,6 +135,13 @@ const turnoStats = computed(() => {
   return { total, pendientes, confirmados, completados };
 });
 
+// Extrae un array de la respuesta, soportando tanto arrays directos como respuestas paginadas {content: [...]}
+function extractArray(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.content)) return data.content;
+  return [];
+}
+
 async function loadLookups() {
   try {
     const [profRes, sucRes, estRes, osRes] = await Promise.all([
@@ -123,11 +150,13 @@ async function loadLookups() {
       axios.get(`${API}/estudios`, { headers: headers() }),
       axios.get(`${API}/obras-sociales`, { headers: headers() }),
     ]);
-    profesionales.value = profRes.data;
-    sucursales.value = sucRes.data;
-    estudios.value = estRes.data;
-    obrasSociales.value = osRes.data;
-  } catch { /* silent */ }
+    profesionales.value = extractArray(profRes.data);
+    sucursales.value = extractArray(sucRes.data);
+    estudios.value = extractArray(estRes.data);
+    obrasSociales.value = extractArray(osRes.data);
+  } catch (e) {
+    console.error("Error cargando lookups:", e);
+  }
 }
 
 async function loadTurnos() {
@@ -138,8 +167,9 @@ async function loadTurnos() {
     if (filterProfId.value) url += `&profesionalId=${filterProfId.value}`;
     if (filterSucId.value) url += `&sucursalId=${filterSucId.value}`;
     const res = await axios.get(url, { headers: headers() });
-    turnos.value = res.data;
-  } catch {
+    turnos.value = extractArray(res.data);
+  } catch (e) {
+    console.error("Error cargando turnos:", e);
     globalError.value = "Error al cargar turnos.";
   } finally { loading.value = false; }
 }
@@ -158,9 +188,12 @@ async function searchPacientes() {
   if (pacienteSearch.value.length < 2) { pacienteResults.value = []; return; }
   try {
     const res = await axios.get(`${API}/pacientes?q=${encodeURIComponent(pacienteSearch.value)}`, { headers: headers() });
-    pacienteResults.value = res.data.slice(0, 8);
+    const arr = extractArray(res.data);
+    pacienteResults.value = arr.slice(0, 8);
     pacienteSearched.value = true;
-  } catch { /* silent */ }
+  } catch (e) {
+    console.error("Error buscando pacientes:", e);
+  }
 }
 
 function selectPaciente(p: { id: number; nombre: string; apellido: string; dni: string }) {
@@ -174,7 +207,7 @@ function selectPaciente(p: { id: number; nombre: string; apellido: string; dni: 
 const showQuickPaciente = ref(false);
 const quickForm = ref({
   nombre: "", apellido: "", dni: "", fechaNacimiento: "",
-  sexo: "", telefono: "", email: "", obraSocialId: "", planId: "",
+  sexo: "", telefono: "", email: "", direccion: "", obraSocialId: "",
 });
 const quickSaving = ref(false);
 const quickError  = ref("");
@@ -186,8 +219,8 @@ function openQuickPaciente() {
     nombre: parts.slice(1).join(" ") || "",
     apellido: parts[0] || "",
     dni: /^\d+$/.test(pacienteSearch.value.trim()) ? pacienteSearch.value.trim() : "",
-    fechaNacimiento: "", sexo: "", telefono: "", email: "",
-    obraSocialId: "", planId: "",
+    fechaNacimiento: "", sexo: "", telefono: "", email: "", direccion: "",
+    obraSocialId: "",
   };
   quickError.value = "";
   showQuickPaciente.value = true;
@@ -195,21 +228,21 @@ function openQuickPaciente() {
 
 async function saveQuickPaciente() {
   quickError.value = "";
-  if (!quickForm.value.nombre || !quickForm.value.apellido || !quickForm.value.dni) {
-    quickError.value = "Nombre, apellido y DNI son obligatorios."; return;
+  if (!quickForm.value.nombre || !quickForm.value.dni || !quickForm.value.fechaNacimiento || !quickForm.value.telefono || !quickForm.value.email) {
+    quickError.value = "Nombre, DNI, fecha de nacimiento, teléfono y email son obligatorios."; return;
   }
   quickSaving.value = true;
   try {
     const res = await axios.post(`${API}/pacientes`, {
       nombre:           quickForm.value.nombre,
-      apellido:         quickForm.value.apellido,
+      apellido:         quickForm.value.apellido || quickForm.value.nombre,
       dni:              quickForm.value.dni,
-      fechaNacimiento:  quickForm.value.fechaNacimiento || null,
+      fechaNacimiento:  quickForm.value.fechaNacimiento,
       sexo:             quickForm.value.sexo || null,
-      telefono:         quickForm.value.telefono || null,
-      email:            quickForm.value.email || null,
+      telefono:         quickForm.value.telefono,
+      email:            quickForm.value.email,
+      direccion:        quickForm.value.direccion || "S/D",
       obraSocialId:     quickForm.value.obraSocialId ? Number(quickForm.value.obraSocialId) : null,
-      planId:           quickForm.value.planId ? Number(quickForm.value.planId) : null,
     }, { headers: headers() });
 
     // Auto-seleccionar el paciente recién creado
@@ -399,6 +432,21 @@ function formatDate(dt: string) {
               <label class="text-sm font-medium">Sucursal <span class="text-destructive">*</span></label>
               <Select v-model="newForm.sucursalId" :options="sucOptions.slice(1)" placeholder="Seleccione..." />
             </div>
+          </div>
+
+          <!-- Calendario de horarios disponibles -->
+          <div v-if="newForm.profesionalId && newForm.sucursalId" class="mt-6 pt-6 border-t">
+            <AvailableSlotsAgenda
+              :profesionalId="Number(newForm.profesionalId)"
+              :sucursalId="Number(newForm.sucursalId)"
+              :headers="headers()"
+              :apiUrl="API"
+              @selected="(fechaHora: string) => { newForm.fechaHora = fechaHora.substring(0, 16); showCalendar = false; }"
+              @close="showCalendar = false"
+            />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
             <div class="space-y-1">
               <label class="text-sm font-medium">Fecha y Hora <span class="text-destructive">*</span></label>
               <Input v-model="newForm.fechaHora" type="datetime-local" required />
@@ -573,7 +621,7 @@ function formatDate(dt: string) {
                 <Input v-model="quickForm.dni" placeholder="30100001" />
               </div>
               <div class="space-y-1">
-                <label class="text-sm font-medium">Fecha Nac.</label>
+                <label class="text-sm font-medium">Fecha Nac. <span class="text-destructive">*</span></label>
                 <Input v-model="quickForm.fechaNacimiento" type="date" />
               </div>
               <div class="space-y-1">
@@ -591,36 +639,29 @@ function formatDate(dt: string) {
             <!-- Teléfono + Email -->
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-1">
-                <label class="text-sm font-medium">Teléfono</label>
+                <label class="text-sm font-medium">Teléfono <span class="text-destructive">*</span></label>
                 <Input v-model="quickForm.telefono" placeholder="11-1234-5678" />
               </div>
               <div class="space-y-1">
-                <label class="text-sm font-medium">Email</label>
+                <label class="text-sm font-medium">Email <span class="text-destructive">*</span></label>
                 <Input v-model="quickForm.email" type="email" placeholder="mail@ejemplo.com" />
               </div>
             </div>
 
-            <!-- Obra Social + Plan -->
-            <div class="grid grid-cols-2 gap-3">
-              <div class="space-y-1">
-                <label class="text-sm font-medium">Obra Social</label>
-                <select v-model="quickForm.obraSocialId"
-                  class="w-full text-sm border rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-                  <option value="">Sin obra social</option>
-                  <option v-for="o in obrasSociales" :key="o.id" :value="String(o.id)">{{ o.nombre }}</option>
-                </select>
-              </div>
-              <div class="space-y-1">
-                <label class="text-sm font-medium">Plan</label>
-                <select v-model="quickForm.planId"
-                  :disabled="!quickForm.obraSocialId"
-                  class="w-full text-sm border rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50">
-                  <option value="">Sin plan</option>
-                  <option v-for="p in planesForOs(quickForm.obraSocialId)" :key="p.value" :value="p.value">
-                    {{ p.label }}
-                  </option>
-                </select>
-              </div>
+            <!-- Dirección -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium">Dirección</label>
+              <Input v-model="quickForm.direccion" placeholder="Ej: Calle Principal 123 (opcional)" />
+            </div>
+
+            <!-- Obra Social -->
+            <div class="space-y-1">
+              <label class="text-sm font-medium">Obra Social</label>
+              <select v-model="quickForm.obraSocialId"
+                class="w-full text-sm border rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                <option value="">Sin obra social</option>
+                <option v-for="o in obrasSociales" :key="o.id" :value="String(o.id)">{{ o.nombre }}</option>
+              </select>
             </div>
 
             <!-- Acciones -->

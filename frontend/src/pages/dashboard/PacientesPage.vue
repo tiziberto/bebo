@@ -25,7 +25,6 @@ interface PacienteDto {
   numeroAfiliado: string | null; observaciones: string | null; activo: boolean;
 }
 interface OsOption { value: string; label: string; }
-interface PlanOption { value: string; label: string; }
 
 const pacientes = ref<PacienteDto[]>([]);
 const loading = ref(true);
@@ -36,16 +35,15 @@ const pageSize = 20;
 const totalPages = ref(0);
 const totalElements = ref(0);
 
-const obrasSociales = ref<{ id: number; nombre: string; planes?: { id: number; nombre: string }[] }[]>([]);
-const planesMap = ref<Record<number, { id: number; nombre: string }[]>>({});
+const obrasSociales = ref<{ id: number; nombre: string }[]>([]);
 
 const showNewForm = ref(false);
-const newForm = ref({ nombre: "", apellido: "", dni: "", fechaNacimiento: "", sexo: "", telefono: "", email: "", direccion: "", obraSocialId: "", planId: "", numeroAfiliado: "", observaciones: "" });
+const newForm = ref({ nombre: "", apellido: "", dni: "", fechaNacimiento: "", sexo: "", telefono: "", email: "", direccion: "", obraSocialId: "", numeroAfiliado: "", observaciones: "" });
 const newSaving = ref(false);
 const newError = ref("");
 
 const editingId = ref<number | null>(null);
-const editForm = ref({ nombre: "", apellido: "", dni: "", fechaNacimiento: "", sexo: "", telefono: "", email: "", direccion: "", obraSocialId: "", planId: "", numeroAfiliado: "", observaciones: "" });
+const editForm = ref({ nombre: "", apellido: "", dni: "", fechaNacimiento: "", sexo: "", telefono: "", email: "", direccion: "", obraSocialId: "", numeroAfiliado: "", observaciones: "" });
 const editSaving = ref(false);
 const editError = ref("");
 
@@ -62,12 +60,6 @@ const osOptions = computed<OsOption[]>(() => [
   { value: "", label: "Sin obra social" },
   ...obrasSociales.value.map(os => ({ value: String(os.id), label: os.nombre }))
 ]);
-
-function planesForOs(osId: string): PlanOption[] {
-  if (!osId) return [];
-  const planes = planesMap.value[Number(osId)] || [];
-  return planes.map(p => ({ value: String(p.id), label: p.nombre }));
-}
 
 async function loadPage(page: number) {
   loading.value = true;
@@ -89,11 +81,6 @@ async function loadPage(page: number) {
     if (osRes) {
       const osData: typeof obrasSociales.value = osRes.data.content ?? osRes.data;
       obrasSociales.value = osData;
-      const pm: Record<number, { id: number; nombre: string }[]> = {};
-      for (const os of osData) {
-        if (os.planes) pm[os.id] = os.planes;
-      }
-      planesMap.value = pm;
     }
   } catch {
     globalError.value = "Error al cargar datos.";
@@ -116,14 +103,17 @@ async function createPaciente() {
     newError.value = "Nombre, apellido y DNI son obligatorios.";
     return;
   }
+  if (!newForm.value.fechaNacimiento || !newForm.value.sexo || !newForm.value.telefono || !newForm.value.email) {
+    newError.value = "Fecha de nacimiento, sexo, teléfono y email son obligatorios.";
+    return;
+  }
   newSaving.value = true;
   try {
     await axios.post(`${API}/pacientes`, {
       ...newForm.value,
       obraSocialId: newForm.value.obraSocialId ? Number(newForm.value.obraSocialId) : null,
-      planId: newForm.value.planId ? Number(newForm.value.planId) : null,
     }, { headers: headers() });
-    newForm.value = { nombre: "", apellido: "", dni: "", fechaNacimiento: "", sexo: "", telefono: "", email: "", direccion: "", obraSocialId: "", planId: "", numeroAfiliado: "", observaciones: "" };
+    newForm.value = { nombre: "", apellido: "", dni: "", fechaNacimiento: "", sexo: "", telefono: "", email: "", direccion: "", obraSocialId: "", numeroAfiliado: "", observaciones: "" };
     showNewForm.value = false;
     await loadData();
   } catch (e: any) {
@@ -138,7 +128,6 @@ function startEdit(p: PacienteDto) {
     fechaNacimiento: p.fechaNacimiento ?? "", sexo: p.sexo ?? "",
     telefono: p.telefono ?? "", email: p.email ?? "", direccion: p.direccion ?? "",
     obraSocialId: p.obraSocialId ? String(p.obraSocialId) : "",
-    planId: p.planId ? String(p.planId) : "",
     numeroAfiliado: p.numeroAfiliado ?? "", observaciones: p.observaciones ?? "",
   };
   editError.value = "";
@@ -147,12 +136,15 @@ function startEdit(p: PacienteDto) {
 
 async function saveEdit(p: PacienteDto) {
   editError.value = "";
+  if (!editForm.value.fechaNacimiento || !editForm.value.sexo || !editForm.value.telefono || !editForm.value.email) {
+    editError.value = "Fecha de nacimiento, sexo, teléfono y email son obligatorios.";
+    return;
+  }
   editSaving.value = true;
   try {
     await axios.put(`${API}/pacientes/${p.id}`, {
       ...editForm.value,
       obraSocialId: editForm.value.obraSocialId ? Number(editForm.value.obraSocialId) : null,
-      planId: editForm.value.planId ? Number(editForm.value.planId) : null,
     }, { headers: headers() });
     editingId.value = null;
     await loadData();
@@ -221,20 +213,20 @@ async function deletePaciente(id: number) {
               <Input v-model="newForm.dni" placeholder="12345678" required />
             </div>
             <div class="space-y-1">
-              <label class="text-sm font-medium">Fecha de Nacimiento</label>
-              <Input v-model="newForm.fechaNacimiento" type="date" />
+              <label class="text-sm font-medium">Fecha de Nacimiento <span class="text-destructive">*</span></label>
+              <Input v-model="newForm.fechaNacimiento" type="date" required />
             </div>
             <div class="space-y-1">
-              <label class="text-sm font-medium">Sexo</label>
-              <Select v-model="newForm.sexo" :options="sexoOptions" placeholder="Seleccione..." />
+              <label class="text-sm font-medium">Sexo <span class="text-destructive">*</span></label>
+              <Select v-model="newForm.sexo" :options="sexoOptions" placeholder="Seleccione..." required />
             </div>
             <div class="space-y-1">
-              <label class="text-sm font-medium">Teléfono</label>
-              <Input v-model="newForm.telefono" placeholder="011-1234-5678" />
+              <label class="text-sm font-medium">Teléfono <span class="text-destructive">*</span></label>
+              <Input v-model="newForm.telefono" placeholder="011-1234-5678" required />
             </div>
             <div class="space-y-1">
-              <label class="text-sm font-medium">Email</label>
-              <Input v-model="newForm.email" type="email" placeholder="correo@ejemplo.com" />
+              <label class="text-sm font-medium">Email <span class="text-destructive">*</span></label>
+              <Input v-model="newForm.email" type="email" placeholder="correo@ejemplo.com" required />
             </div>
             <div class="space-y-1 sm:col-span-2">
               <label class="text-sm font-medium">Dirección</label>
@@ -243,10 +235,6 @@ async function deletePaciente(id: number) {
             <div class="space-y-1">
               <label class="text-sm font-medium">Obra Social</label>
               <Select v-model="newForm.obraSocialId" :options="osOptions" placeholder="Sin obra social" />
-            </div>
-            <div class="space-y-1">
-              <label class="text-sm font-medium">Plan</label>
-              <Select v-model="newForm.planId" :options="planesForOs(newForm.obraSocialId)" placeholder="Seleccione plan..." />
             </div>
             <div class="space-y-1">
               <label class="text-sm font-medium">N° Afiliado</label>
@@ -323,7 +311,6 @@ async function deletePaciente(id: number) {
                         <Input v-model="editForm.telefono" placeholder="Teléfono" class="h-8 text-sm" />
                         <Input v-model="editForm.email" placeholder="Email" class="h-8 text-sm" />
                         <Select v-model="editForm.obraSocialId" :options="osOptions" class="h-8 text-xs" />
-                        <Select v-model="editForm.planId" :options="planesForOs(editForm.obraSocialId)" class="h-8 text-xs" placeholder="Plan..." />
                         <Input v-model="editForm.numeroAfiliado" placeholder="N° Afiliado" class="h-8 text-sm" />
                       </div>
                       <div class="flex justify-end gap-2">

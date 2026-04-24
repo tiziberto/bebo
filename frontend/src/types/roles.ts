@@ -1,9 +1,9 @@
+import { type Component } from "vue";
 import {
   Users, Stethoscope, Building2, CalendarDays, FileText, Settings,
   ClipboardList, Send, UserCheck, DollarSign, Copy, Archive,
   Receipt, BarChart3, FileSpreadsheet, BookOpen, Ban, Activity,
   Calendar, Download, Phone, Heart, Clock, Briefcase,
-  type Component,
 } from "lucide-vue-next";
 
 export type UserRole =
